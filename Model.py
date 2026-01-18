@@ -418,74 +418,9 @@ def preprocess_sim(config):
 
     return user_indices, item_indices
 
-
-def softmax(x, tau=1.0):
-    """数值稳定的 Softmax"""
-    x = np.array(x)
-    x_max = np.max(x)
-    exp_x = np.exp((x - x_max) / tau)
-    return exp_x / (np.sum(exp_x) + 1e-12)
-
-
-def filter_by_softmax_similarity(
-    user_train,
-    beh_item_list,
-    user_modal_emb,
-    item_modal_emb,
-    n_items,
-    softmax_threshold=0.05,   # Softmax 概率低于此值则删除
-    temperature=1.0,          # Softmax 温度参数
-    n_behs=None
-):
-    if n_behs is None:
-        n_behs = len(beh_item_list)
-    
-    # 转为 NumPy
-    if isinstance(user_modal_emb, torch.Tensor):
-        user_modal_emb = user_modal_emb.cpu().numpy()
-    if isinstance(item_modal_emb, torch.Tensor):
-        item_modal_emb = item_modal_emb.cpu().numpy()
-
-    user_ids = user_train.flatten()
-    N = len(user_ids)
-
-    for j in range(n_behs - 1):  # 非目标行为
-        interactions = beh_item_list[j].copy()
-        L = interactions.shape[1]
-
-        for i in range(N):
-            uid = user_ids[i]
-            items = interactions[i]
-            valid_mask = (items != n_items)
-            if not np.any(valid_mask):
-                continue
-
-            valid_items = items[valid_mask]
-            M = len(valid_items)
-
-            # 计算原始相似度
-            u_emb = user_modal_emb[uid].reshape(1, -1)
-            v_embs = item_modal_emb[valid_items]
-            sims_raw = cosine_similarity(u_emb, v_embs).flatten()  # (M,)
-
-            # Softmax 归一化
-            probs = softmax(sims_raw, tau=temperature)  # (M,)
-
-            # 删除概率低于阈值的交互
-            to_remove = probs < softmax_threshold
-            valid_items[to_remove] = n_items
-
-            # 写回
-            interactions[i][valid_mask] = valid_items
-
-        beh_item_list[j] = interactions
-
-    return beh_item_list
-
-
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
-    torch.cuda.set_device(1)
+    torch.cuda.set_device(0)
     os.environ["GIT_PYTHON_REFRESH"] = "quiet"
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
@@ -579,19 +514,6 @@ if __name__ == '__main__':
 
     nonshared_idx = -1
 
-    sim_threshold = 0.2  # 硬噪声筛选阈值
-
-
-    beh_item_list = filter_by_softmax_similarity(
-    user_train=user_train1,
-    beh_item_list=beh_item_list,
-    user_modal_emb=user_text_tensor,
-    item_modal_emb=item_text_tensor,
-    n_items=n_items,
-    softmax_threshold=sim_threshold,   
-    temperature=1.0
-    )
-
     for epoch in range(args.epoch):
         # 在每个epoch中将数据的顺序打乱
         model.train()
@@ -636,7 +558,7 @@ if __name__ == '__main__':
             pos_score_user = torch.exp(pos_score_user / ssl_temp)
             ttl_score_user = torch.matmul(normalize_user_emb1, normalize_all_user_emb2.T)
             ttl_score_user = torch.sum(torch.exp(ttl_score_user / ssl_temp), dim=1)
-            batch_inter_ssl_loss = -torch.sum(torch.log(pos_score_user / ttl_score_user)) * 0.1
+            batch_inter_ssl_loss = -torch.sum(torch.log(pos_score_user / ttl_score_user)) * 0.01
 
             # ------------------- MLP 模态对齐 loss -------------------
             u_batch_emb = ua_embeddings[u_batch_list]   # [B, emb_dim]
@@ -645,7 +567,7 @@ if __name__ == '__main__':
             user_align_loss = 1 - F.cosine_similarity(u_batch_emb, h_user[u_batch_list], dim=1).mean()
             item_align_loss = 1 - F.cosine_similarity(i_batch_emb, h_item[i_batch_list], dim=1).mean()
 
-            batch_align_loss = (user_align_loss + item_align_loss) * 10
+            batch_align_loss = (user_align_loss + item_align_loss)
 
             # ------------------- Rec/Emb loss -------------------
             batch_rec_loss, batch_emb_loss = recloss(u_batch, beh_batch, ua_embeddings, ia_embeddings, rela_embeddings)
@@ -698,13 +620,13 @@ if __name__ == '__main__':
             perf_str = 'Epoch %d [%.1fs + %.1fs]:, recall=[%.5f, %.5f], ' \
                        'precision=[%.5f, %.5f], hit=[%.5f, %.5f], ndcg=[%.5f, %.5f]' % \
                        (
-                           epoch, t2 - t1, t3 - t2, ret['recall'][1],
-                           ret['recall'][3],
-                           ret['precision'][1], ret['precision'][3], ret['hit_ratio'][1], ret['hit_ratio'][3],
-                           ret['ndcg'][1], ret['ndcg'][3])
+                           epoch, t2 - t1, t3 - t2, ret['recall'][0],
+                           ret['recall'][1],
+                           ret['precision'][0], ret['precision'][1], ret['hit_ratio'][0], ret['hit_ratio'][1],
+                           ret['ndcg'][0], ret['ndcg'][1])
             print(perf_str)
 
-        cur_best_pre_0, stopping_step, should_stop, flag = early_stopping_new(ret['recall'][1], cur_best_pre_0,
+        cur_best_pre_0, stopping_step, should_stop, flag = early_stopping_new(ret['recall'][0], cur_best_pre_0,
                                                                               stopping_step, expected_order='acc',
                                                                               flag_step=10)
         # *********************************************************

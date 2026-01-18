@@ -91,17 +91,13 @@ def parse_args():
     # ******************************   model hyper paras      ***************************** #
     parser.add_argument('--n_fold', type=int, default=50)
     parser.add_argument('--att_dim', type=int, default=16, help='self att dim')  # d_a
-    parser.add_argument('--wid', nargs='?', default='[0.1,0.1,0.1]',
-                        help='negative weight, [0.1,0.1,0.1] for beibei, [0.01,0.01,0.01] for taobao')
+    parser.add_argument('--wid', nargs='?', default='[0.01,0.01,0.01]')
 
-    # TODO
-    parser.add_argument('--decay', type=float, default=10,
-                        help='Regularization, 10 for beibei, 0.01 for taobao')  # regularization decay
+    parser.add_argument('--decay', type=float, default=0.01,) 
 
     parser.add_argument('--mf_decay', type=float, default=1, help='mf loss decay')  # mf loss decay
 
-    parser.add_argument('--coefficient', nargs='?', default='[0.0/6, 5.0/6, 1.0/6]',
-                        help='Regularization, [0.0/6, 5.0/6, 1.0/6] for beibei, [1.0/6, 4.0/6, 1.0/6] for taobao')
+    parser.add_argument('--coefficient', nargs='?', default='[0.0/6, 5.0/6, 1.0/6]')
 
     parser.add_argument('--mess_dropout', nargs='?', default='[0.3]',
                         help='Keep probability w.r.t. message dropout')

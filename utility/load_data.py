@@ -31,7 +31,8 @@ class DataHandler(object):
             behs = ['click', 'like', 'comment', 'train']
 
         elif self.dataset_name.find('Tmall') != -1:
-            behs = ['click', 'cart', 'train']
+            # behs = ['click', 'cart', 'train']
+            behs = ['click_denoised', 'cart_denoised', 'train']
 
         elif self.dataset_name.find('IJCAI') != -1:
             behs = ['click', 'fav', 'cart', 'train']
